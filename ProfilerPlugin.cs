@@ -35,12 +35,26 @@ namespace UnturnedProfiler
     // ReSharper disable InconsistentNaming
     public class ProfilerPlugin : RocketPlugin<ProfilerConfig>
     {
+        public static ProfilerPlugin Instance { get; private set; }
+        protected override void Load()
+        {
+            base.Load();
+            Instance = this;
+        }
+
+        protected override void Unload()
+        {
+            base.Unload();
+            Instance = null;
+        }
+
         private static bool _isProfiling;
         private static readonly Dictionary<Assembly, Dictionary<Type, List<MeasurableObject>>> Assemblies = new Dictionary<Assembly, Dictionary<Type, List<MeasurableObject>>>();
         private static readonly HarmonyInstance Harmony = HarmonyInstance.Create("de.static-interface.unturnedprofiler");
 
         private bool _patchedPlugins;
         private bool _patchedUnturned;
+        private bool _patchedRocket;
 
         [RocketCommandAlias("Startp")]
         [RocketCommand("StartProfiling", "Starts profiling")]
@@ -64,21 +78,7 @@ namespace UnturnedProfiler
                     try
                     {
                         var assembly = pl.GetType().Assembly;
-                        Assemblies.Add(assembly, new Dictionary<Type, List<MeasurableObject>>());
-                        UnturnedChat.Say(caller, "Patching: " + assembly.FullName);
-                        List<Type> types = ReflectionUtils.GetTypes(assembly);
-                        bool measurable = false;
-                        foreach (var type in types)
-                        {
-                            if (!typeof(Component).IsAssignableFrom(type))
-                                continue;
-
-                            if (Patchtype(type))
-                                measurable = true;
-                        }
-
-                        if (!measurable)
-                            Assemblies.Remove(assembly);
+                        PatchAssembly(assembly);
                     }
                     catch (Exception e)
                     {
@@ -94,7 +94,16 @@ namespace UnturnedProfiler
 
             if (Configuration.Instance.ProfileUnturned && !_patchedUnturned)
             {
+                PatchAssembly(typeof(SDG.Unturned.Player).Assembly); //Assembly-CSharp.dll
                 _patchedUnturned = true;
+            }
+
+            if (Configuration.Instance.ProfileRocketMod && !_patchedRocket)
+            {
+                PatchAssembly(typeof(Rocket.Core.R).Assembly); //Rocket.Core.dll
+                PatchAssembly(typeof(Rocket.Unturned.U).Assembly); //Rocket.Unturned.dll
+                PatchAssembly(typeof(Rocket.API.RocketPlayer).Assembly); //Rocket.API.dll
+                _patchedRocket = true;
             }
         }
 
@@ -103,12 +112,29 @@ namespace UnturnedProfiler
         private readonly HarmonyMethod _postFixedUpdate = new HarmonyMethod(typeof(ProfilerPlugin), nameof(HijackFixedUpdatePostfix));
         private readonly HarmonyMethod _postLateUpdate = new HarmonyMethod(typeof(ProfilerPlugin), nameof(HijackLateUpdatePostfix));
 
+        private void PatchAssembly(Assembly assembly)
+        {
+            Assemblies.Add(assembly, new Dictionary<Type, List<MeasurableObject>>());
+            List<Type> types = ReflectionUtils.GetTypes(assembly);
+            bool measurable = false;
+            foreach (var type in types)
+            {
+                if (!typeof(Component).IsAssignableFrom(type))
+                    continue;
+
+                if (Patchtype(type))
+                    measurable = true;
+            }
+
+            if (!measurable)
+                Assemblies.Remove(assembly);
+        }
+
         private bool Patchtype(Type type)
         {
             Assemblies[type.Assembly].Add(type, new List<MeasurableObject>());
 
             bool measurable = false;
-            Logger.Log("Looking for update methods: " + type.FullName);
             var updateMethod = ReflectionUtils.FindMethod(type, "update", StringComparison.OrdinalIgnoreCase);
             if (updateMethod != null)
             {
@@ -152,7 +178,7 @@ namespace UnturnedProfiler
                     Type = type,
                     MeasureType = MeasurableObjectType.FrameLateUpdate,
                     Measures = new List<decimal>(),
-                    Method= lateUpdateMethod
+                    Method = lateUpdateMethod
                 };
                 Assemblies[type.Assembly][type].Add(o);
                 Logger.Log("LateUpdate found: " + type.FullName + "." + lateUpdateMethod.Name);
@@ -163,10 +189,9 @@ namespace UnturnedProfiler
             if (!measurable)
             {
                 Assemblies[type.Assembly].Remove(type);
-                return false;
             }
 
-            return true;
+            return measurable;
         }
 
         [HarmonyPrefix]
@@ -207,9 +232,15 @@ namespace UnturnedProfiler
             sw.Reset();
 
             MeasurableObject o = Assemblies[instance.GetType().Assembly][instance.GetType()].First(c => c.MeasureType == type);
+
+            if (Instance != null && o.Measures.Count > Instance.Configuration.Instance.MaxFrameCount) // we might do profiling during a reload, so we need to check if instance is null
+            {
+                return;
+            }
+
             o.Measures.Add(time);
         }
-        
+
         [RocketCommandAlias("Stopp")]
         [RocketCommand("StopProfiling", "Stops profiling")]
         public void StopProfiling(IRocketPlayer caller, string[] args)
@@ -229,32 +260,46 @@ namespace UnturnedProfiler
                     List<decimal> fixedUpdateFrames = new List<decimal>();
                     List<decimal> lateUpdateFrame = new List<decimal>();
 
+                    //fill data for lists above
                     foreach (var type in Assemblies[assembly].Keys)
                     {
                         updateFrames.AddRange(Assemblies[assembly][type].FirstOrDefault(c => c.MeasureType == MeasurableObjectType.FrameUpdate)?.Measures ?? new List<decimal>());
                         fixedUpdateFrames.AddRange(Assemblies[assembly][type].FirstOrDefault(c => c.MeasureType == MeasurableObjectType.FrameFixedUpdate)?.Measures ?? new List<decimal>());
                         lateUpdateFrame.AddRange(Assemblies[assembly][type].FirstOrDefault(c => c.MeasureType == MeasurableObjectType.FrameLateUpdate)?.Measures ?? new List<decimal>());
+
                     }
 
+                    //calculate & log averages
                     logger.WriteLine("Module {0} (avg. update: {1}, avg. fixed update: {2}, avg. late update: {3})", Path.GetFileName(assembly.Location),
                         updateFrames.Count > 0 ? updateFrames.Average().ToString("0") + "ms" : "<not measured>",
-                        fixedUpdateFrames.Count > 0 ? fixedUpdateFrames.Average() + "ms" : "<not measured>", 
+                        fixedUpdateFrames.Count > 0 ? fixedUpdateFrames.Average() + "ms" : "<not measured>",
                         lateUpdateFrame.Count > 0 ? lateUpdateFrame.Average() + "ms" : "<not measured>");
 
                     foreach (var type in Assemblies[assembly].Keys)
                     {
+                        if (Assemblies[assembly][type].Count == 0 || Assemblies[assembly][type].All(c => c.Measures.Count == 0))
+                            continue;
+
                         logger.WriteLine("\t{0} [{1}]", type.FullName, type.BaseType.Name);
 
                         foreach (var o in Assemblies[assembly][type])
                         {
-                            if(o.Measures.Count == 0)
+                            if (o.Measures.Count == 0)
                                 continue;
                             logger.WriteLine("\t\t{0}.{1}() (avg. {2:0}ms, min. {3}ms, max. {4}ms, frame count {5})", o.Name, o.Method.Name, o.Measures.Average(), o.Measures.Min(), o.Measures.Max(), o.Measures.Count);
                         }
+
+                        //clear mess & free memory
+                        Assemblies[assembly][type].All((c) =>
+                        {
+                            c.Measures.Clear();
+                            return true;
+                        });
                     }
                 }
                 logger.Close();
             }
+
             UnturnedChat.Say(caller, "Profiling stopped");
         }
 

@@ -22,10 +22,10 @@ namespace UnturnedProfiler
     public class ProfilerConfig : IRocketPluginConfiguration
     {
         public string LogFile { get; set; } = "Profiler.log";
-        public bool EnableBinaryLog { get; set; } = true;
         public bool ProfileUnturned { get; set; } = false;
         public bool ProfilePlugins { get; set; } = true;
-
+        public bool ProfileRocketMod { get; set; } = false;
+        public int MaxFrameCount { get; set; } = 10000;
         public void LoadDefaults()
         {
 
