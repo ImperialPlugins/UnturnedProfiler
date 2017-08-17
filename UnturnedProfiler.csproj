@@ -66,6 +66,18 @@
   <ItemGroup>
     <Compile Include="MeasurableObject.cs" />
     <Compile Include="MeasurableObjectType.cs" />
+    <Compile Include="Patches\EventImpl\OnBeforePlayerConnectedPatch.cs" />
+    <Compile Include="Patches\EventImpl\OnPlayerDeadPatch.cs" />
+    <Compile Include="Patches\EventImpl\OnPlayerDeathPatch.cs" />
+    <Compile Include="Patches\EventImpl\OnPlayerDisconnectedPatch.cs" />
+    <Compile Include="Patches\EventImpl\OnPlayerRevivePatch.cs" />
+    <Compile Include="Patches\EventPatch.cs" />
+    <Compile Include="Patches\UpdateImpl\FixedUpdatePatch.cs" />
+    <Compile Include="Patches\UpdateImpl\LateUpdatePatch.cs" />
+    <Compile Include="Patches\EventImpl\OnPlayerConnectedPatch.cs" />
+    <Compile Include="Patches\Patch.cs" />
+    <Compile Include="Patches\UpdateBasePatch.cs" />
+    <Compile Include="Patches\UpdateImpl\UpdatePatch.cs" />
     <Compile Include="ProfilerConfig.cs" />
     <Compile Include="ReflectionUtils.cs" />
     <Compile Include="UnityHeapDump.cs" />

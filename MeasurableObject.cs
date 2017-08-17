@@ -15,13 +15,14 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 using System;
 using System.Collections.Generic;
 using System.Reflection;
 
 namespace UnturnedProfiler
 {
-    class MeasurableObject
+    public class MeasurableObject
     {
         public string Name { get; set; }
         public Type Type { get; set; }

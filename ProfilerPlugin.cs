@@ -15,19 +15,25 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using Harmony;
+using HighlightingSystem;
 using Rocket.API;
 using Rocket.Core;
 using Rocket.Core.Commands;
 using Rocket.Core.Plugins;
+using Rocket.Unturned;
 using Rocket.Unturned.Chat;
+using Rocket.Unturned.Events;
 using UnityEngine;
+using UnturnedProfiler.Patches;
+using UnturnedProfiler.Patches.EventImpl;
+using UnturnedProfiler.Patches.UpdateImpl;
 using Logger = Rocket.Core.Logging.Logger;
 
 namespace UnturnedProfiler
@@ -48,25 +54,32 @@ namespace UnturnedProfiler
             Instance = null;
         }
 
-        private static bool _isProfiling;
-        private static readonly Dictionary<Assembly, Dictionary<Type, List<MeasurableObject>>> Assemblies = new Dictionary<Assembly, Dictionary<Type, List<MeasurableObject>>>();
-        private static readonly HarmonyInstance Harmony = HarmonyInstance.Create("de.static-interface.unturnedprofiler");
+        public static bool IsProfiling { get; private set; }
+        public readonly Dictionary<Assembly, Dictionary<Type, List<MeasurableObject>>> Assemblies = new Dictionary<Assembly, Dictionary<Type, List<MeasurableObject>>>();
+        public readonly Dictionary<string, List<MeasurableObject>> Events = new Dictionary<string, List<MeasurableObject>>();
+
+        public HarmonyInstance Harmony { get; } = HarmonyInstance.Create("de.static-interface.unturnedprofiler");
 
         private bool _patchedPlugins;
         private bool _patchedUnturned;
         private bool _patchedRocket;
+        private bool _patchedEvents;
+
+        private readonly UpdatePatch UpdatePatch = new UpdatePatch();
+        private readonly FixedUpdatePatch FixedUpdatePatch = new FixedUpdatePatch();
+        private readonly LateUpdatePatch LateUpdatePatch = new LateUpdatePatch();
 
         [RocketCommandAlias("Startp")]
         [RocketCommand("StartProfiling", "Starts profiling")]
         public void StartProfiling(IRocketPlayer caller, string[] args)
         {
-            if (_isProfiling)
+            if (IsProfiling)
             {
                 UnturnedChat.Say(caller, "Profiling is already running", Color.red);
                 return;
             }
 
-            _isProfiling = true;
+            IsProfiling = true;
             UnturnedChat.Say(caller, "Profiling started");
 
             if (Configuration.Instance.ProfilePlugins && !_patchedPlugins)
@@ -95,22 +108,45 @@ namespace UnturnedProfiler
             if (Configuration.Instance.ProfileUnturned && !_patchedUnturned)
             {
                 PatchAssembly(typeof(SDG.Unturned.Player).Assembly); //Assembly-CSharp.dll
+                PatchAssembly(typeof(Highlighter).Assembly); //Assembly-CSharp-firstpass.dll
                 _patchedUnturned = true;
             }
 
             if (Configuration.Instance.ProfileRocketMod && !_patchedRocket)
             {
-                PatchAssembly(typeof(Rocket.Core.R).Assembly); //Rocket.Core.dll
-                PatchAssembly(typeof(Rocket.Unturned.U).Assembly); //Rocket.Unturned.dll
-                PatchAssembly(typeof(Rocket.API.RocketPlayer).Assembly); //Rocket.API.dll
+                PatchAssembly(typeof(R).Assembly); //Rocket.Core.dll
+                PatchAssembly(typeof(U).Assembly); //Rocket.Unturned.dll
+                PatchAssembly(typeof(RocketPlayer).Assembly); //Rocket.API.dll
                 _patchedRocket = true;
+            }
+
+            if (Configuration.Instance.ProfileEvents && !_patchedEvents)
+            {
+                PatchEvents();
+                _patchedEvents = true;
             }
         }
 
-        private readonly HarmonyMethod _prefixMethod = new HarmonyMethod(typeof(ProfilerPlugin), nameof(HijackPrefix));
-        private readonly HarmonyMethod _postUpdate = new HarmonyMethod(typeof(ProfilerPlugin), nameof(HijackUpdatePostfix));
-        private readonly HarmonyMethod _postFixedUpdate = new HarmonyMethod(typeof(ProfilerPlugin), nameof(HijackFixedUpdatePostfix));
-        private readonly HarmonyMethod _postLateUpdate = new HarmonyMethod(typeof(ProfilerPlugin), nameof(HijackLateUpdatePostfix));
+        private void PatchEvents()
+        {
+            EventPatch patch = new OnBeforePlayerConnectedPatch();
+            patch.PatchObject(U.Events, nameof(U.Events.OnBeforePlayerConnected));
+
+            patch = new OnPlayerConnectedPatch();
+            patch.PatchObject(U.Events, nameof(U.Events.OnPlayerConnected));
+
+            patch = new OnPlayerDisconnectedPatch();
+            patch.PatchObject(U.Events, nameof(U.Events.OnPlayerDisconnected));
+            
+            patch = new OnPlayerRevivePatch();
+            patch.PatchObject(typeof(UnturnedPlayerEvents), nameof(UnturnedPlayerEvents.OnPlayerRevive));
+
+            patch = new OnPlayerDeadPatch();
+            patch.PatchObject(typeof(UnturnedPlayerEvents), nameof(UnturnedPlayerEvents.OnPlayerDead));
+
+            patch = new OnPlayerDeathPatch();
+            patch.PatchObject(typeof(UnturnedPlayerEvents), nameof(UnturnedPlayerEvents.OnPlayerDeath));
+        }
 
         private void PatchAssembly(Assembly assembly)
         {
@@ -138,51 +174,21 @@ namespace UnturnedProfiler
             var updateMethod = ReflectionUtils.FindMethod(type, "update", StringComparison.OrdinalIgnoreCase);
             if (updateMethod != null)
             {
-                MeasurableObject o = new MeasurableObject
-                {
-                    Name = type.FullName,
-                    Type = type,
-                    MeasureType = MeasurableObjectType.FrameUpdate,
-                    Measures = new List<decimal>(),
-                    Method = updateMethod
-                };
-                Assemblies[type.Assembly][type].Add(o);
-                Logger.Log("UpdateMethod found: " + type.FullName + "." + updateMethod.Name);
-                Harmony.Patch(updateMethod, _prefixMethod, _postUpdate);
+                UpdatePatch.PatchObject(type, updateMethod.Name);
                 measurable = true;
             }
 
             var fixedUpdateMethod = ReflectionUtils.FindMethod(type, "fixedupdate", StringComparison.OrdinalIgnoreCase);
             if (fixedUpdateMethod != null)
             {
-                MeasurableObject o = new MeasurableObject
-                {
-                    Name = type.FullName,
-                    Type = type,
-                    MeasureType = MeasurableObjectType.FrameFixedUpdate,
-                    Measures = new List<decimal>(),
-                    Method = fixedUpdateMethod
-                };
-                Assemblies[type.Assembly][type].Add(o);
-                Logger.Log("FixedUpdate found: " + type.FullName + "." + fixedUpdateMethod.Name);
-                Harmony.Patch(fixedUpdateMethod, _prefixMethod, _postFixedUpdate);
+                FixedUpdatePatch.PatchObject(type, fixedUpdateMethod.Name);
                 measurable = true;
             }
 
             var lateUpdateMethod = ReflectionUtils.FindMethod(type, "lateupdate", StringComparison.OrdinalIgnoreCase);
             if (lateUpdateMethod != null)
             {
-                MeasurableObject o = new MeasurableObject
-                {
-                    Name = type.FullName,
-                    Type = type,
-                    MeasureType = MeasurableObjectType.FrameLateUpdate,
-                    Measures = new List<decimal>(),
-                    Method = lateUpdateMethod
-                };
-                Assemblies[type.Assembly][type].Add(o);
-                Logger.Log("LateUpdate found: " + type.FullName + "." + lateUpdateMethod.Name);
-                Harmony.Patch(lateUpdateMethod, _prefixMethod, _postLateUpdate);
+                LateUpdatePatch.PatchObject(type, lateUpdateMethod.Name);
                 measurable = true;
             }
 
@@ -194,64 +200,17 @@ namespace UnturnedProfiler
             return measurable;
         }
 
-        [HarmonyPrefix]
-        public static void HijackPrefix(object __instance, ref object __state)
-        {
-            if (!_isProfiling)
-                return;
-
-            Stopwatch sw = new Stopwatch();
-            sw.Start();
-            __state = sw;
-        }
-
-        [HarmonyPostfix]
-        public static void HijackUpdatePostfix(object __instance, object __state)
-        {
-            DoPostfix(__instance, MeasurableObjectType.FrameUpdate, (Stopwatch)__state);
-        }
-
-        [HarmonyPostfix]
-        public static void HijackFixedUpdatePostfix(object __instance, object __state)
-        {
-            DoPostfix(__instance, MeasurableObjectType.FrameFixedUpdate, (Stopwatch)__state);
-        }
-
-        [HarmonyPostfix]
-        public static void HijackLateUpdatePostfix(object __instance, object __state)
-        {
-            DoPostfix(__instance, MeasurableObjectType.FrameLateUpdate, (Stopwatch)__state);
-        }
-
-        private static void DoPostfix(object instance, MeasurableObjectType type, Stopwatch sw)
-        {
-            if (!_isProfiling)
-                return;
-
-            long time = sw.ElapsedMilliseconds;
-            sw.Reset();
-
-            MeasurableObject o = Assemblies[instance.GetType().Assembly][instance.GetType()].First(c => c.MeasureType == type);
-
-            if (Instance != null && o.Measures.Count > Instance.Configuration.Instance.MaxFrameCount) // we might do profiling during a reload, so we need to check if instance is null
-            {
-                return;
-            }
-
-            o.Measures.Add(time);
-        }
-
         [RocketCommandAlias("Stopp")]
         [RocketCommand("StopProfiling", "Stops profiling")]
         public void StopProfiling(IRocketPlayer caller, string[] args)
         {
-            if (!_isProfiling)
+            if (!IsProfiling)
             {
                 UnturnedChat.Say(caller, "Profiling is not running", Color.red);
                 return;
             }
 
-            _isProfiling = false;
+            IsProfiling = false;
             using (var logger = new StreamWriter(Configuration.Instance.LogFile))
             {
                 foreach (var assembly in Assemblies.Keys)
@@ -280,23 +239,37 @@ namespace UnturnedProfiler
                         if (Assemblies[assembly][type].Count == 0 || Assemblies[assembly][type].All(c => c.Measures.Count == 0))
                             continue;
 
-                        logger.WriteLine("\t{0} [{1}]", type.FullName, type.BaseType.Name);
+                        logger.WriteLine("\t{0} [{1}]", type.FullName, type.BaseType?.Name ?? "none");
 
                         foreach (var o in Assemblies[assembly][type])
                         {
                             if (o.Measures.Count == 0)
                                 continue;
-                            logger.WriteLine("\t\t{0}.{1}() (avg. {2:0}ms, min. {3}ms, max. {4}ms, frame count {5})", o.Name, o.Method.Name, o.Measures.Average(), o.Measures.Min(), o.Measures.Max(), o.Measures.Count);
+                            logger.WriteLine("\t\t{0}.{1}() (avg. {2:0}ms, min. {3}ms, max. {4}ms, frame count {5})", o.Type.FullName, o.Method.Name, o.Measures.Average(), o.Measures.Min(), o.Measures.Max(), o.Measures.Count);
                         }
-
-                        //clear mess & free memory
-                        Assemblies[assembly][type].All((c) =>
-                        {
-                            c.Measures.Clear();
-                            return true;
-                        });
                     }
                 }
+
+                logger.WriteLine();
+                logger.WriteLine("Events:");
+
+                foreach (var @event in Events.Keys)
+                {
+                    if(Events[@event].Sum(o => o.Measures.Count) == 0)
+                        continue;
+
+                    logger.WriteLine("\t{0}()", @event);
+
+                    foreach (var o in Events[@event])
+                    {
+                        if (o.Measures.Count == 0)
+                            continue;
+                        logger.WriteLine("\t\t{0}.{1}() (avg. {2:0}ms, min. {3}ms, max. {4}ms, event trigger count {5})", o.Type.FullName, o.Method.Name, o.Measures.Average(), o.Measures.Min(), o.Measures.Max(), o.Measures.Count);
+                    }
+                }
+
+                Assemblies.Clear();
+                Events.Clear();
                 logger.Close();
             }
 

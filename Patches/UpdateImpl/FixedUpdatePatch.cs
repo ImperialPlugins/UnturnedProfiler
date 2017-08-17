@@ -1,4 +1,4 @@
-/*
+﻿/*
  *  Unturned Profiler - A plugin to profile Unturned servers for analyzing lag causes
  *  Copyright (C) 2017 Trojaner <trojaner25@gmail.com>
  *
@@ -16,22 +16,27 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-using Rocket.API;
+using Harmony;
 
-namespace UnturnedProfiler
+namespace UnturnedProfiler.Patches.UpdateImpl
 {
-    public class ProfilerConfig : IRocketPluginConfiguration
+    public class FixedUpdatePatch : UpdateBasePatch
     {
-        public string LogFile { get; set; } = "Profiler.log";
-        public bool ProfileUnturned { get; set; } = false;
-        public bool ProfilePlugins { get; set; } = true;
-        public bool ProfileRocketMod { get; set; } = false;
-        public bool ProfileEvents { get; set; } = true;
-
-        public int MaxFrameCount { get; set; } = 10000;
-        public void LoadDefaults()
+        public FixedUpdatePatch() : base(new HarmonyMethod(typeof(FixedUpdatePatch), nameof(HijackPrefix)), new HarmonyMethod(typeof(FixedUpdatePatch), nameof(HijackPostfix)))
         {
-
         }
+
+        public static void HijackPrefix(object __instance, ref object __state)
+        {
+            DoPrefix(__instance, ref __state);
+        }
+
+        public static void HijackPostfix(object __instance, object __state)
+        {
+            DoPostfix(__instance, __state, MeasurableObjectType.FrameFixedUpdate);
+        }
+        
+        public override MeasurableObjectType MeasureType
+            => MeasurableObjectType.FrameFixedUpdate;
     }
 }
