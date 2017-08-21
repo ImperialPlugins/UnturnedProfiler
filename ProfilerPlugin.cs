@@ -284,7 +284,7 @@ namespace UnturnedProfiler
             if (!System.IO.Directory.Exists("Profiler"))
                 System.IO.Directory.CreateDirectory("Profiler");
             UnityHeapDump.Create("Profiler/Dump");
-            UnturnedChat.Say(caller, "Dumped memory at profiler/dumb");
+            UnturnedChat.Say(caller, "Dumped memory at Profiler/Dump");
         }
     }
 }
