@@ -31,6 +31,7 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
         private static readonly HarmonyMethod s_PrefixMethod;
         private static readonly HarmonyMethod s_PostfixMethod;
         private static readonly Dictionary<MethodBase, MeasurableMethod> s_Registrations = new Dictionary<MethodBase, MeasurableMethod>();
+        private static readonly List<MethodBase> s_PatchedMethods = new List<MethodBase>();
 
         public static Dictionary<MethodBase, MeasurableMethod> GetAllRegistrations()
         {
@@ -52,8 +53,12 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
 
             var method = measurableMethod.Method;
 
-            var pluginInstance = ProfilerPlugin.Instance;
-            pluginInstance.Harmony.Patch(method, s_PrefixMethod, s_PostfixMethod);
+            if (!s_PatchedMethods.Contains(method))
+            {
+                var pluginInstance = ProfilerPlugin.Instance;
+                pluginInstance.Harmony.Patch(method, s_PrefixMethod, s_PostfixMethod);
+                s_PatchedMethods.Add(method);
+            }
 
             if (!s_Registrations.ContainsKey(method))
             {
@@ -68,12 +73,12 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
 
         public static void ClearRegistrations()
         {
-            foreach (var reg in s_Registrations.Keys)
-            {
-                var pluginInstance = ProfilerPlugin.Instance;
-                pluginInstance.Harmony.Unpatch(reg, s_PrefixMethod.method);
-                pluginInstance.Harmony.Unpatch(reg, s_PostfixMethod.method);
-            }
+            //foreach (var reg in s_Registrations.Keys)
+            //{
+            //    var pluginInstance = ProfilerPlugin.Instance;
+            //    pluginInstance.Harmony.Unpatch(reg, s_PrefixMethod.method);
+            //    pluginInstance.Harmony.Unpatch(reg, s_PostfixMethod.method);
+            //}
 
             s_Registrations.Clear();
         }
