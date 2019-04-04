@@ -26,9 +26,11 @@ namespace ImperialPlugins.UnturnedProfiler
 {
     public class ProfilerPlugin : RocketPlugin<ProfilerConfig>
     {
+        public const string HarmonyInstanceId = "com.imperialplugins.unturnedprofiler";
+
         public static ProfilerPlugin Instance { get; private set; }
         public bool IsProfiling { get; internal set; }
-        public HarmonyInstance Harmony { get; } = HarmonyInstance.Create("com.imperialplugins.unturnedprofiler");
+        public HarmonyInstance Harmony { get; } = HarmonyInstance.Create(HarmonyInstanceId);
 
         protected override void Load()
         {

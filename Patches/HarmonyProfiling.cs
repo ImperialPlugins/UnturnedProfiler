@@ -18,12 +18,11 @@
  */
 #endregion
 
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Reflection;
 using Harmony;
-using Rocket.Core.Logging;
 
 namespace ImperialPlugins.UnturnedProfiler.Patches
 {
@@ -31,9 +30,9 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
     {
         private static readonly HarmonyMethod s_PrefixMethod;
         private static readonly HarmonyMethod s_PostfixMethod;
-        private static readonly Dictionary<string, List<MeasurableMethod>> s_Registrations = new Dictionary<string, List<MeasurableMethod>>();
+        private static readonly Dictionary<MethodBase, MeasurableMethod> s_Registrations = new Dictionary<MethodBase, MeasurableMethod>();
 
-        public static Dictionary<string, List<MeasurableMethod>> GetAllRegistrations()
+        public static Dictionary<MethodBase, MeasurableMethod> GetAllRegistrations()
         {
             return s_Registrations;
         }
@@ -46,27 +45,37 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
 
         public static void RegisterMethod(MeasurableMethod measurableMethod)
         {
-            var methodBase = measurableMethod.Method;
+            if (measurableMethod == null)
+            {
+                throw new ArgumentNullException(nameof(measurableMethod));
+            }
+
+            var method = measurableMethod.Method;
 
             var pluginInstance = ProfilerPlugin.Instance;
-            pluginInstance.Harmony.Patch(methodBase, s_PrefixMethod, s_PostfixMethod);
+            pluginInstance.Harmony.Patch(method, s_PrefixMethod, s_PostfixMethod);
 
-            var declaringType = methodBase.DeclaringType;
-            if (declaringType == null)
+            if (!s_Registrations.ContainsKey(method))
             {
-                Logger.LogWarning("DeclaringType null for: " + methodBase.Name);
-                return;
+                s_Registrations.Add(method, measurableMethod);
+            }
+            else
+            {
+                //throw new Exception("Already registered method: " + method.GetFullName());
+                s_Registrations[method] = measurableMethod;
+            }
+        }
+
+        public static void ClearRegistrations()
+        {
+            foreach (var reg in s_Registrations.Keys)
+            {
+                var pluginInstance = ProfilerPlugin.Instance;
+                pluginInstance.Harmony.Unpatch(reg, s_PrefixMethod.method);
+                pluginInstance.Harmony.Unpatch(reg, s_PostfixMethod.method);
             }
 
-            var declaringAssembly = declaringType.Assembly;
-            var measureType = measurableMethod.MeasureType;
-
-            if (!s_Registrations.ContainsKey(measureType))
-            {
-                s_Registrations.Add(measureType, new List<MeasurableMethod>());
-            }
-
-            s_Registrations[measureType].Add(measurableMethod);
+            s_Registrations.Clear();
         }
 
         public static void OnPreExecution(ref object __state, MethodBase __originalMethod)
@@ -97,32 +106,12 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
             sw.Stop();
             long time = sw.ElapsedMilliseconds;
 
-            if (s_Registrations == null)
+            if (!s_Registrations.ContainsKey(__originalMethod))
             {
                 return;
             }
-
-            var type = __originalMethod.DeclaringType;
-            if (type == null)
-            {
-                return;
-            }
-
-            MeasurableMethod o = null;
-            foreach (var measureType in s_Registrations.Values)
-            {
-                o = measureType.FirstOrDefault(c => c.Method == __originalMethod);
-                if (o != null)
-                {
-                    break;
-                }
-            }
-
-            if (o == null)
-            {
-                return;
-            }
-
+            
+            MeasurableMethod o = s_Registrations[__originalMethod];
             if (ProfilerPlugin.Instance != null && o.Measurements.Count > ProfilerPlugin.Instance.Configuration.Instance.MaxFrameCount)
             {
                 // we might do profiling during a reload, so we need to check if instance is null

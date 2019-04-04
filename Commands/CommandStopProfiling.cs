@@ -44,16 +44,20 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
                 return;
             }
 
+            string fileName = "Profiler-" + DateTime.Now.Ticks + ".log";
+
             pluginInstance.IsProfiling = false;
-            using (var logger = new StreamWriter("Profiler-" + DateTime.Now.Ticks + ".log"))
+            using (var logger = new StreamWriter(fileName))
             {
-                foreach (var measureType in registrations.Keys)
+                var measureTypes = registrations.Values.Where(d => d.Measurements.Count > 0).Select(c => c.MeasureType).Distinct();
+
+                foreach (var measureType in measureTypes)
                 {
                     StringBuilder sb = new StringBuilder();
                     sb.AppendLine($"{measureType}:");
 
                     bool anyCallsMeasured = false;
-                    foreach (var measurableMethod in registrations[measureType])
+                    foreach (var measurableMethod in registrations.Values.Where(d => d.MeasureType.Equals(measureType, StringComparison.OrdinalIgnoreCase)))
                     {
                         var assemblyName = measurableMethod.Method.DeclaringType?.Assembly?.GetName()?.Name?.StripUtf8() ?? "<unknown>";
                         var measurements = measurableMethod.Measurements;
@@ -79,8 +83,8 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
                 logger.Close();
             }
 
-            registrations.Clear();
-            UnturnedChat.Say(caller, "Profiling stopped");
+            HarmonyProfiling.ClearRegistrations();
+            UnturnedChat.Say(caller, $"Profiling stopped. Saved as {fileName}.");
         }
 
         public AllowedCaller AllowedCaller { get; } = AllowedCaller.Both;

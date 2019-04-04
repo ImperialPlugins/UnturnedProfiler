@@ -53,7 +53,12 @@ namespace ImperialPlugins.UnturnedProfiler.Patches
                 throw new ArgumentNullException(nameof(field));
             }
 
-            var eventDelegate = field.GetValue(instance) as MulticastDelegate;
+            var eventDelegate = field.GetValue(instance) as Delegate;
+            if (eventDelegate == null)
+            {
+                return;
+            }
+
             Register(field.Name, eventDelegate);
         }
 

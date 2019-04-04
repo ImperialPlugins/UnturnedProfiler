@@ -26,6 +26,7 @@ using System.Threading;
 using ImperialPlugins.UnturnedProfiler.Extensions;
 using ImperialPlugins.UnturnedProfiler.Patches;
 using Rocket.API;
+using Rocket.Core;
 using Rocket.Unturned;
 using Rocket.Unturned.Chat;
 using Rocket.Unturned.Events;
@@ -69,14 +70,12 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
                 }
 
                 RegisterEvents();
-                UnturnedChat.Say(caller, "Profiling started");
+                UnturnedChat.Say(caller, "Profiling started.");
             });
         }
 
         private void RegisterEvents()
         {
-            RegisterEvents(typeof(UnturnedPlayerEvents));
-            RegisterEvents(typeof(ChatManager));
             RegisterEvents(U.Events);
         }
 
@@ -89,36 +88,76 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
             }
 
             RegisterEvents(instance.GetType(), instance);
+
+            foreach (var client in Provider.clients)
+            {
+
+            }
         }
 
         private void RegisterEvents(Type type, object instance = null)
         {
-            //foreach (var @event in type.GetEvents(ReflectionExtensions.AllBindingFlags))
-            //{
-            //    FieldInfo fi = type.GetField(@event.Name);
-            //    EventProfiling.Register(fi, (object) null);
-            //}
-
-            foreach (var field in type.GetFields(ReflectionExtensions.AllBindingFlags))
+            if (type.ContainsGenericParameters)
             {
-                if (instance == null && !field.IsStatic)
-                {
-                    continue;
-                }
+                return;
+            }
 
-                if (typeof(Delegate).IsAssignableFrom(field.FieldType))
+            try
+            {
+                foreach (var field in type.GetFields(ReflectionExtensions.AllBindingFlags))
                 {
+                    if (instance == null && !field.IsStatic)
+                    {
+                        continue;
+                    }
+
+                    if (field.Name.Contains("<>"))
+                    {
+                        continue;
+                    }
+                    
+                    if (!typeof(Delegate).IsAssignableFrom(field.FieldType))
+                    {
+                        continue;
+                    }
+
                     EventProfiling.Register(field, instance);
                 }
+            }
+            catch 
+            {
+                // ignored
             }
         }
 
         private void RegisterAssembly(Assembly assembly)
         {
-            List<Type> types = assembly.GetAllTypes();
+            string[] excludedAssemblies = {
+                "Harmony",
+                "System",
+                "UnturnedProfiler",
+                "Mono",
+                "Microsoft",
+                "Newtonsoft",
+                "Pathfinding",
+                "UnityEngine.UI",
+                "UnityEngine.Video",
+                "UnityEngine.Networking",
+                "UnityEngine.Timeline",
+                "UnityEngine.PostProcessing",
+                "AstarPath",
+            };
 
+            if (excludedAssemblies.Any(c => assembly.FullName.Contains(c)))
+            {
+                return;
+            }
+
+            List<Type> types = assembly.GetAllTypes();
             foreach (var type in types)
             {
+                RegisterEvents(type);
+
                 if (!typeof(Component).IsAssignableFrom(type))
                     continue;
 
