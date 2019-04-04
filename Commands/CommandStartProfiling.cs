@@ -153,7 +153,7 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
             foreach (var unityEventName in unityEvents)
             {
                 var method = methods.FirstOrDefault(c => c.Name.Equals(unityEventName, StringComparison.OrdinalIgnoreCase) && c.GetParameters().Length == 0);
-                if (method == null || method.IsAbstract)
+                if (method == null || method.IsAbstract || method.GetMethodBody() == null)
                 {
                     continue;
                 }
