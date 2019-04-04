@@ -66,7 +66,7 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
                             continue;
                         }
 
-                        string methodName = measurableMethod.Method.GetFullName();
+                        string methodName = measurableMethod.Method.GetFullName().StripUtf8();
 
                         //calculate & log averages
                         sb.AppendLine($"\t {assemblyName} {methodName} (avg: {measurements.Average():0}ms, min: {measurements.Min():0}ms, max: {measurements.Max():0}ms, calls: {measurements.Count})");
