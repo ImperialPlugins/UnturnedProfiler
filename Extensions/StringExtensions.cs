@@ -1,6 +1,7 @@
+﻿#region Copyright
 /*
- *  Unturned Profiler - A plugin to profile Unturned servers for analyzing lag causes
- *  Copyright (C) 2017 Trojaner <trojaner25@gmail.com>
+ *  Unturned Profiler - A plugin for profiling Unturned servers and analyzing lag causes
+ *  Copyright (C) 2017-2019 Enes Sadık Özbek <esozbek.me>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -15,19 +16,25 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#endregion
 
-using System;
-using System.Collections.Generic;
-using System.Reflection;
+using System.Text;
 
-namespace UnturnedProfiler
+namespace ImperialPlugins.UnturnedProfiler.Extensions
 {
-    public class MeasurableObject
+    public static class StringExtensions
     {
-        public string Name { get; set; }
-        public Type Type { get; set; }
-        public List<decimal> Measures { get; set; }
-        public MeasurableObjectType MeasureType { get; set; }
-        public MethodBase Method { get; set; }
+        public static string StripUtf8(this string @this)
+        {
+            if (@this == null)
+            {
+                return null;
+            }
+
+            var inputBytes = Encoding.UTF8.GetBytes(@this);
+            var outputBytes = Encoding.Convert(Encoding.UTF8, Encoding.ASCII, inputBytes);
+
+            return Encoding.ASCII.GetString(outputBytes);
+        }
     }
 }

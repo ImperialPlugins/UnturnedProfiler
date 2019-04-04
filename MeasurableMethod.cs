@@ -1,6 +1,7 @@
+#region Copyright
 /*
- *  Unturned Profiler - A plugin to profile Unturned servers for analyzing lag causes
- *  Copyright (C) 2017 Trojaner <trojaner25@gmail.com>
+ *  Unturned Profiler - A plugin for profiling Unturned servers and analyzing lag causes
+ *  Copyright (C) 2017-2019 Enes Sad?k Özbek <esozbek.me>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -15,19 +16,17 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#endregion
 
-namespace UnturnedProfiler
+using System.Collections.Generic;
+using System.Reflection;
+
+namespace ImperialPlugins.UnturnedProfiler
 {
-    public enum MeasurableObjectType
+    public class MeasurableMethod
     {
-        FrameUpdate,
-        FrameFixedUpdate,
-        FrameLateUpdate,
-        BeforePlayerConnectedEvent,
-        PlayerConnectedEvent,
-        PlayerDisconnectedEvent,
-        PlayerReviveEvent,
-        PlayerDeathEvent,
-        PlayerDeadEvent
+        public List<decimal> Measurements { get; set; }
+        public string MeasureType { get; set; }
+        public MethodBase Method { get; set; }
     }
 }

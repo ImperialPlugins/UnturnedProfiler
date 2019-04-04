@@ -1,6 +1,7 @@
+#region Copyright
 /*
- *  Unturned Profiler - A plugin to profile Unturned servers for analyzing lag causes
- *  Copyright (C) 2017 Trojaner <trojaner25@gmail.com>
+ *  Unturned Profiler - A plugin for profiling Unturned servers and analyzing lag causes
+ *  Copyright (C) 2017-2019 Enes Sad?k Özbek <esozbek.me>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -15,20 +16,16 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#endregion
 
 using Rocket.API;
 
-namespace UnturnedProfiler
+namespace ImperialPlugins.UnturnedProfiler.Configuration
 {
     public class ProfilerConfig : IRocketPluginConfiguration
     {
-        public string LogFile { get; set; } = "Profiler.log";
-        public bool ProfileUnturned { get; set; } = false;
-        public bool ProfilePlugins { get; set; } = true;
-        public bool ProfileRocketMod { get; set; } = false;
-        public bool ProfileEvents { get; set; } = true;
-
         public int MaxFrameCount { get; set; } = 10000;
+
         public void LoadDefaults()
         {
 

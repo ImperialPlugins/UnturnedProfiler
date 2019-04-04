@@ -18,28 +18,25 @@
  */
 #endregion
 
-using Harmony;
-using ImperialPlugins.UnturnedProfiler.Configuration;
-using Rocket.Core.Plugins;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Rocket.Core.Utils;
 
-namespace ImperialPlugins.UnturnedProfiler
+namespace ImperialPlugins.UnturnedProfiler.Extensions
 {
-    public class ProfilerPlugin : RocketPlugin<ProfilerConfig>
+    public static class ReflectionExtensions
     {
-        public static ProfilerPlugin Instance { get; private set; }
-        public bool IsProfiling { get; internal set; }
-        public HarmonyInstance Harmony { get; } = HarmonyInstance.Create("com.imperialplugins.unturnedprofiler");
-
-        protected override void Load()
+        public const BindingFlags AllBindingFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static;
+        public static List<Type> GetAllTypes(this Assembly assembly)
         {
-            base.Load();
-            Instance = this;
+            return RocketHelper.GetTypes(new List<Assembly> {assembly});
         }
 
-        protected override void Unload()
+        public static string GetFullName(this MethodBase method)
         {
-            base.Unload();
-            Instance = null;
+            return $"{method.ReflectedType?.FullName ?? "<unknown>"}.{method.Name}({string.Join(", ", method.GetParameters().Select(o => $"{o.ParameterType} {o.Name}").ToArray())})";
         }
     }
 }

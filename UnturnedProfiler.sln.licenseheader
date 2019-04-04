@@ -1,4 +1,5 @@
-﻿#region Copyright
+﻿extensions: .cs
+#region Copyright
 /*
  *  Unturned Profiler - A plugin for profiling Unturned servers and analyzing lag causes
  *  Copyright (C) 2017-2019 Enes Sadık Özbek <esozbek.me>
@@ -17,29 +18,3 @@
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #endregion
-
-using Harmony;
-using ImperialPlugins.UnturnedProfiler.Configuration;
-using Rocket.Core.Plugins;
-
-namespace ImperialPlugins.UnturnedProfiler
-{
-    public class ProfilerPlugin : RocketPlugin<ProfilerConfig>
-    {
-        public static ProfilerPlugin Instance { get; private set; }
-        public bool IsProfiling { get; internal set; }
-        public HarmonyInstance Harmony { get; } = HarmonyInstance.Create("com.imperialplugins.unturnedprofiler");
-
-        protected override void Load()
-        {
-            base.Load();
-            Instance = this;
-        }
-
-        protected override void Unload()
-        {
-            base.Unload();
-            Instance = null;
-        }
-    }
-}
