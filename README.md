@@ -1,15 +1,13 @@
 # UnturnedProfiler
-A plugin to profile Unturned servers for analyzing lag causes and for profiling plugin performance
+A plugin to profile Unturned servers for analyzing lag causes and for profiling plugin performance.
 
-Since this started to draw a lot of attention let me make this clear:
+## For Users
 This plugin is meant for developers to optimize their plugins. It is currently not user friendly and it will not help you find any lag cause if you do not have required knowledge about plugin development.
 
-The plugin is not on RocketMod or other plugin sites on purpose.
+This plugin was not published on RocketMod or other plugin sites on purpose.
 
-For developers:
+## For Developers
 Install this plugin on a server, run `/startp`, wait about 2-3 minutes and then do `/stopp` (stops profiling, not server).
-After that a Profiler.log will be written at `Unturned/Servers/<server instance>/Rocket/`.
+After that a Profiler-XXXXXXX.log will be generated in `Unturned/Servers/<server instance>/Rocket/`.
 
-The log will show how much time a method requires to execute. Currently only Update(), FixedUpdate(), LateUpdate() and some methods which use Rocket Events are profiled. You can see whats profiled [here](https://github.com/Trojaner25/UnturnedProfiler/blob/master/MeasurableObjectType.cs).
-
-Depending on the result of [this suggestion](https://github.com/pardeike/Harmony/issues/36) I will add even more profiling.
+The log will show how much time a method required to execute. Currently some of the Unity component functions (e.g. Update(), FixedUpdate(), LateUpdate() etc.) and some RocketMod and Unturned Events are profiled.
