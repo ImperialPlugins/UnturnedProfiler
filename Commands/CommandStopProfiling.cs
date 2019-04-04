@@ -22,6 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using ImperialPlugins.UnturnedProfiler.Extensions;
 using ImperialPlugins.UnturnedProfiler.Patches;
 using Rocket.API;
@@ -48,8 +49,10 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
             {
                 foreach (var measureType in registrations.Keys)
                 {
-                    logger.WriteLine($"{measureType}:");
+                    StringBuilder sb = new StringBuilder();
+                    sb.AppendLine($"{measureType}:");
 
+                    bool anyCallsMeasured = false;
                     foreach (var measurableMethod in registrations[measureType])
                     {
                         var assemblyName = measurableMethod.Method.DeclaringType?.Assembly?.GetName()?.Name?.StripUtf8() ?? "<unknown>";
@@ -62,10 +65,15 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
                         string methodName = measurableMethod.Method.GetFullName();
 
                         //calculate & log averages
-                        logger.WriteLine("\t {0} {1} (avg.: {2:0}ms, min: {3:0}ms, max: {4:0}ms)", assemblyName, methodName, measurements.Average(), measurements.Min(), measurements.Max());
+                        sb.AppendLine($"\t {assemblyName} {methodName} (avg: {measurements.Average():0}ms, min: {measurements.Min():0}ms, max: {measurements.Max():0}ms, calls: {measurements.Count})");
+                        anyCallsMeasured = true;
                     }
 
-                    logger.WriteLine();
+                    if (anyCallsMeasured)
+                    {
+                        logger.Write(sb.ToString());
+                        logger.WriteLine();
+                    }
                 }
 
                 logger.Close();
