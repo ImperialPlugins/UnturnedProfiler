@@ -146,6 +146,7 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
                 "UnityEngine.Timeline",
                 "UnityEngine.PostProcessing",
                 "AstarPath",
+                "mscorlib"
             };
 
             if (excludedAssemblies.Any(c => assembly.FullName.Contains(c)))
