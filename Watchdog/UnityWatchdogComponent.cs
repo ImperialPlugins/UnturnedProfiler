@@ -1,7 +1,7 @@
-#region Copyright
+﻿#region Copyright
 /*
  *  Unturned Profiler - A plugin for profiling Unturned servers and analyzing lag causes
- *  Copyright (C) 2017-2019 Enes Sad?k �zbek <esozbek.me>
+ *  Copyright (C) 2017-2019 Enes Sadık Özbek <esozbek.me>
  *
  *  This program is free software: you can redistribute it and/or modify
  *  it under the terms of the GNU Affero General Public License as
@@ -18,18 +18,32 @@
  */
 #endregion
 
-using Rocket.API;
+using System;
+using System.Threading;
+using UnityEngine;
 
-namespace ImperialPlugins.UnturnedProfiler.Configuration
+namespace ImperialPlugins.UnturnedProfiler.Watchdog
 {
-    public class ProfilerConfig : IRocketPluginConfiguration
+    public class UnityWatchdogComponent : MonoBehaviour
     {
-        public int MaxFrameCount { get; set; } = 10000;
-        public int WatchdogTimeoutMilliSeconds { get; set; } = 750;
+        public TimeSpan Timeout { get; set; }
+        private ThreadWatchdog m_Watchdog;
 
-        public void LoadDefaults()
+        public void Awake()
         {
+            m_Watchdog = new ThreadWatchdog(Thread.CurrentThread, Timeout);
+            m_Watchdog.Start();
+        }
 
+        public void OnDestroy()
+        {
+            m_Watchdog?.Dispose();
+            m_Watchdog = null;
+        }
+
+        public void Update()
+        {
+            m_Watchdog.NotifyAlive();
         }
     }
 }

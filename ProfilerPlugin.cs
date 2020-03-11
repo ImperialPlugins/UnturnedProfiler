@@ -18,9 +18,12 @@
  */
 #endregion
 
+using System;
 using Harmony;
 using ImperialPlugins.UnturnedProfiler.Configuration;
+using ImperialPlugins.UnturnedProfiler.Watchdog;
 using Rocket.Core.Plugins;
+using UnityEngine;
 
 namespace ImperialPlugins.UnturnedProfiler
 {
@@ -32,16 +35,28 @@ namespace ImperialPlugins.UnturnedProfiler
         public bool IsProfiling { get; internal set; }
         public HarmonyInstance Harmony { get; } = HarmonyInstance.Create(HarmonyInstanceId);
 
+        private GameObject m_WatchdogGameObject;
+
         protected override void Load()
         {
             base.Load();
             Instance = this;
+
+            m_WatchdogGameObject = new GameObject();
+            DontDestroyOnLoad(m_WatchdogGameObject);
+
+            m_WatchdogGameObject.SetActive(false);
+            var watchdogComponent = m_WatchdogGameObject.AddComponent<UnityWatchdogComponent>();
+            watchdogComponent.Timeout = TimeSpan.FromMilliseconds(Configuration.Instance.WatchdogTimeoutMilliSeconds);
+            m_WatchdogGameObject.SetActive(true);
         }
 
         protected override void Unload()
         {
             base.Unload();
             Instance = null;
+            Destroy(m_WatchdogGameObject);
+            m_WatchdogGameObject = null;
         }
     }
 }
