@@ -19,7 +19,12 @@
 #endregion
 
 using System;
+using System.Collections;
 using System.Diagnostics;
+using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.Serialization;
+using System.Security;
 using System.Threading;
 
 namespace ImperialPlugins.UnturnedProfiler.Watchdog
@@ -78,9 +83,9 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine("[Watchdog] --------------------------------");
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("[Watchdog] Caused by assembly: " + (stackTrace?.GetFrame(0).GetMethod()?.DeclaringType?.Assembly.GetName().Name ?? "<unknown>"));
+                    Console.WriteLine("[Watchdog] Caused by assembly: " + (stackTrace?.GetFrame(0)?.GetMethod()?.DeclaringType?.Assembly.GetName().Name ?? "<unknown>"));
                     Console.ForegroundColor = foregroundColor;
-                    
+
                     m_NotifyNextFrozen = false;
                 }
             }
@@ -131,7 +136,9 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
 
             try
             {
-                stackTrace = new StackTrace(targetThread, false);
+                stackTrace = FormatterServices.GetUninitializedObject(typeof(StackTrace)) as StackTrace;
+                var captureStackTraceMethod = typeof(StackTrace).GetMethod("CaptureStackTrace", BindingFlags.NonPublic | BindingFlags.Instance);
+                captureStackTraceMethod.Invoke(stackTrace, new object[] { 0 /* iSkip */, false /* fNeedFileInfo */, m_TargetThread, null /* e */ });
             }
             catch (Exception ex)
             {
