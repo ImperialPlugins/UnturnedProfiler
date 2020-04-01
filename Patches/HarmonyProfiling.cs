@@ -22,7 +22,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Reflection;
-using Harmony;
+using HarmonyLib;
 
 namespace ImperialPlugins.UnturnedProfiler.Patches
 {

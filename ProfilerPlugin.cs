@@ -19,7 +19,7 @@
 #endregion
 
 using System;
-using Harmony;
+using HarmonyLib;
 using ImperialPlugins.UnturnedProfiler.Configuration;
 using ImperialPlugins.UnturnedProfiler.Watchdog;
 using Rocket.Core.Plugins;
@@ -33,7 +33,7 @@ namespace ImperialPlugins.UnturnedProfiler
 
         public static ProfilerPlugin Instance { get; private set; }
         public bool IsProfiling { get; internal set; }
-        public HarmonyInstance Harmony { get; } = HarmonyInstance.Create(HarmonyInstanceId);
+        public Harmony Harmony { get; } = new Harmony(HarmonyInstanceId);
 
         private GameObject m_WatchdogGameObject;
 

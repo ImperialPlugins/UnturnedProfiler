@@ -6,7 +6,7 @@
     <OutputType>Library</OutputType>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Lib.Harmony" Version="1.2.0.1" />
+    <PackageReference Include="Lib.Harmony" Version="2.0.0.9" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
