@@ -25,6 +25,7 @@ namespace ImperialPlugins.UnturnedProfiler.Configuration
     public class ProfilerConfig : IRocketPluginConfiguration
     {
         public int MaxFrameCount { get; set; } = 10000;
+        public bool EnableWatchdog { get; set; } = true;
         public int WatchdogTimeoutMilliSeconds { get; set; } = 750;
 
         public void LoadDefaults()

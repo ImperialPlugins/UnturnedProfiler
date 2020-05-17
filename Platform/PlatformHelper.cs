@@ -18,32 +18,17 @@
  */
 #endregion
 
-using System;
-using System.Threading;
-using UnityEngine;
-
-namespace ImperialPlugins.UnturnedProfiler.Watchdog
+namespace ImperialPlugins.UnturnedProfiler.Platform
 {
-    public class UnityWatchdogComponent : MonoBehaviour
+    public static class PlatformHelper
     {
-        public TimeSpan Timeout { get; set; }
-        private ThreadWatchdog m_Watchdog;
-        
-        public void Awake()
+        public static bool IsLinux
         {
-            m_Watchdog = new ThreadWatchdog(Thread.CurrentThread, Timeout);
-            m_Watchdog.Start();
-        }
-
-        public void OnDestroy()
-        {
-            m_Watchdog?.Dispose();
-            m_Watchdog = null;
-        }
-
-        public void Update()
-        {
-            m_Watchdog.NotifyAlive();
+            get
+            {
+                int p = (int)System.Environment.OSVersion.Platform;
+                return (p == 4) || (p == 6) || (p == 128);
+            }
         }
     }
 }

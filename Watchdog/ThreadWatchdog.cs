@@ -19,12 +19,10 @@
 #endregion
 
 using System;
-using System.Collections;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
-using System.Security;
 using System.Threading;
 
 namespace ImperialPlugins.UnturnedProfiler.Watchdog
@@ -34,6 +32,7 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
         private readonly Thread m_TargetThread;
         private readonly TimeSpan m_Timeout;
         private readonly ManualResetEvent m_AliveEvent = new ManualResetEvent(false);
+        private MonoProfiler.MonoProfiler m_MonoProfiler;
 
         private Thread m_WatchdogThread;
         private bool m_IsRunning;
@@ -47,6 +46,10 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
 
         public void Start()
         {
+            // doesn't work for now
+            // m_MonoProfiler = new MonoProfiler.MonoProfiler();
+            // m_MonoProfiler.Install();
+
             m_IsRunning = true;
             m_WatchdogThread = new Thread(WatchdogEntryPoint);
             m_WatchdogThread.Start();
@@ -71,7 +74,19 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
                 }
                 else if (m_NotifyNextFrozen)
                 {
-                    var stackTrace = GetStackTrace(m_TargetThread);
+                    var stackTraceList = StackTraceHelper.GetStackTrace(m_TargetThread).Reverse().ToList();
+                    string stacktrace = "";
+                    foreach (var methodBase in stackTraceList)
+                    {
+                        string name = methodBase.Name;
+                        if (methodBase is MemberInfo m)
+                        {
+                            name = (m.DeclaringType?.FullName ?? "<unknown>") + "." + name;
+                        }
+
+                        stacktrace += "at " + name + Environment.NewLine;
+                    }
+
                     var foregroundColor = Console.ForegroundColor;
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine("[Watchdog] --------------------------------");
@@ -79,11 +94,11 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
                     Console.WriteLine("[Watchdog] Warning: Server is frozen since " + m_Timeout.TotalMilliseconds + "ms!");
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine("[Watchdog] Main thread Stacktrace: ");
-                    Console.WriteLine(stackTrace?.ToString() ?? "Failed to get stacktrace.");
+                    Console.WriteLine(string.IsNullOrWhiteSpace(stacktrace) ? "Failed to get stacktrace." : stacktrace);
                     Console.ForegroundColor = ConsoleColor.Yellow;
                     Console.WriteLine("[Watchdog] --------------------------------");
                     Console.ForegroundColor = ConsoleColor.Red;
-                    Console.WriteLine("[Watchdog] Caused by assembly: " + (stackTrace?.GetFrame(0)?.GetMethod()?.DeclaringType?.Assembly.GetName().Name ?? "<unknown>"));
+                    Console.WriteLine("[Watchdog] Caused by assembly: " + (stackTraceList.FirstOrDefault()?.DeclaringType?.Assembly.GetName().Name ?? "<unknown>"));
                     Console.ForegroundColor = foregroundColor;
 
                     m_NotifyNextFrozen = false;
@@ -106,60 +121,9 @@ namespace ImperialPlugins.UnturnedProfiler.Watchdog
 
         public void Dispose()
         {
-            m_AliveEvent?.Dispose();
             Stop();
+            m_AliveEvent?.Dispose();
+            m_MonoProfiler?.Dispose();
         }
-
-#pragma warning disable 618
-        private StackTrace GetStackTrace(Thread targetThread)
-        {
-            StackTrace stackTrace = null;
-            var ready = new ManualResetEventSlim();
-
-            new Thread(() =>
-            {
-                // Backstop to release thread in case of deadlock:
-                ready.Set();
-                Thread.Sleep(200);
-                try
-                {
-                    targetThread.Resume();
-                }
-                catch
-                {
-                    // ignored
-                }
-            }).Start();
-
-            ready.Wait();
-            targetThread.Suspend();
-
-            try
-            {
-                stackTrace = FormatterServices.GetUninitializedObject(typeof(StackTrace)) as StackTrace;
-                var captureStackTraceMethod = typeof(StackTrace).GetMethod("CaptureStackTrace", BindingFlags.NonPublic | BindingFlags.Instance);
-                captureStackTraceMethod.Invoke(stackTrace, new object[] { 0 /* iSkip */, false /* fNeedFileInfo */, m_TargetThread, null /* e */ });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine(ex);
-                /* Deadlock */
-            }
-            finally
-            {
-                try
-                {
-                    targetThread.Resume();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex);
-                    stackTrace = null;  /* Deadlock */
-                }
-            }
-
-            return stackTrace;
-        }
-#pragma warning restore 618
     }
 }

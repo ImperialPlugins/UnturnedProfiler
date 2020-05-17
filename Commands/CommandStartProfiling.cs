@@ -132,24 +132,11 @@ namespace ImperialPlugins.UnturnedProfiler.Commands
 
         private void RegisterAssembly(Assembly assembly)
         {
-            string[] excludedAssemblies = {
-                "Harmony",
-                "System",
-                "UnturnedProfiler",
-                "Mono",
-                "Microsoft",
-                "Newtonsoft",
-                "Pathfinding",
-                "UnityEngine.UI",
-                "UnityEngine.Video",
-                "UnityEngine.Networking",
-                "UnityEngine.Timeline",
-                "UnityEngine.PostProcessing",
-                "AstarPath",
-                "mscorlib"
-            };
-
-            if (excludedAssemblies.Any(c => assembly.FullName.Contains(c)))
+            if (StackTraceHelper.ExcludedAssemblies
+                .Concat(new[]{
+                    "UnturnedProfiler"
+                })
+                .Any(c => assembly.FullName.Contains(c)))
             {
                 return;
             }

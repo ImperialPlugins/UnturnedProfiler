@@ -19,11 +19,19 @@
 #endregion
 
 using System;
+using System.Collections;
+using System.Reflection;
+using System.Threading;
 using HarmonyLib;
 using ImperialPlugins.UnturnedProfiler.Configuration;
+using ImperialPlugins.UnturnedProfiler.MonoProfiler;
+using ImperialPlugins.UnturnedProfiler.Platform;
 using ImperialPlugins.UnturnedProfiler.Watchdog;
 using Rocket.Core.Plugins;
+using Rocket.Core.Utils;
+using Rocket.Unturned.Chat;
 using UnityEngine;
+using Logger = Rocket.Core.Logging.Logger;
 
 namespace ImperialPlugins.UnturnedProfiler
 {
@@ -42,6 +50,37 @@ namespace ImperialPlugins.UnturnedProfiler
             base.Load();
             Instance = this;
 
+            var libraryPlatform = PlatformHelper.IsLinux ? (LibraryPlatform)new LinuxPlatform() : new WindowsPlatform();
+            MonoAPI.Initialize(libraryPlatform);
+
+            if (Configuration.Instance.EnableWatchdog)
+            {
+                Logger.Log("Installing watchdog...", ConsoleColor.Yellow);
+
+                AppDomain.CurrentDomain.AssemblyLoad += OnAssemblyLoad;
+                ThreadPool.QueueUserWorkItem(c =>
+                {
+                    DateTime startTime = DateTime.UtcNow;
+
+                    foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies())
+                    {
+                        try
+                        {
+                            StackTraceHelper.RegisterAssemblyForStacktracePatch(assembly);
+                        }
+                        catch (Exception e)
+                        {
+                            Logger.LogException(e, $"Could not load assembly for patching: {assembly.FullName}, watchdog will not work detect this assembly.");
+                        }
+                    }
+
+                    TaskDispatcher.QueueOnMainThread(() => InstallWatchdog(DateTime.UtcNow - startTime));
+                });
+            }
+        }
+
+        private void InstallWatchdog(TimeSpan time)
+        {
             m_WatchdogGameObject = new GameObject();
             DontDestroyOnLoad(m_WatchdogGameObject);
 
@@ -49,14 +88,26 @@ namespace ImperialPlugins.UnturnedProfiler
             var watchdogComponent = m_WatchdogGameObject.AddComponent<UnityWatchdogComponent>();
             watchdogComponent.Timeout = TimeSpan.FromMilliseconds(Configuration.Instance.WatchdogTimeoutMilliSeconds);
             m_WatchdogGameObject.SetActive(true);
+            Logger.Log($"Watchdog is ready after {time.TotalMilliseconds:####}ms.", ConsoleColor.Green);
+        }
+
+        private void OnAssemblyLoad(object sender, AssemblyLoadEventArgs args)
+        {
+            StackTraceHelper.RegisterAssemblyForStacktracePatch(args.LoadedAssembly);
         }
 
         protected override void Unload()
         {
             base.Unload();
             Instance = null;
-            Destroy(m_WatchdogGameObject);
-            m_WatchdogGameObject = null;
+
+            if (m_WatchdogGameObject != null)
+            {
+                Destroy(m_WatchdogGameObject);
+                m_WatchdogGameObject = null;
+            }
+
+            MonoAPI.Deinitialize();
         }
     }
 }
